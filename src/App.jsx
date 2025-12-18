@@ -10,12 +10,6 @@ function App() {
   const [weather, setWeather] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-  const [city, setCity] = useState('Istanbul')
-
-  useEffect(() => {
-    fetchWeather(city)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   const fetchWeather = async (cityName) => {
     setLoading(true)
@@ -33,7 +27,6 @@ function App() {
 
   const handleSearch = (cityName) => {
     if (cityName.trim()) {
-      setCity(cityName)
       fetchWeather(cityName)
     }
   }
@@ -72,7 +65,7 @@ function App() {
             <WiDaySunnyOvercast style={{ fontSize: '3rem', verticalAlign: 'middle', marginRight: '12px', color: '#1a1a1a' }} />
             Hava Durumu
           </h1>
-          <p className="subtitle">Dünyanın her yerinden hava durumu bilgisi</p>
+          <p className="subtitle">Hava Durumunu Öğrenmek İçin Konum Giriniz</p>
         </header>
 
         <SearchBar onSearch={handleSearch} loading={loading} />
