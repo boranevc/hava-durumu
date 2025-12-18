@@ -231,6 +231,8 @@
 
 .weekly-forecast {
   margin-top: 20px;
+  padding-top: 25px;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
 }
 
 .weekly-title {
@@ -332,67 +334,139 @@
 
 @media (max-width: 768px) {
   .weather-card {
-    padding: 20px;
+    padding: 18px 15px;
+    border-radius: 20px;
+  }
+
+  .weather-header {
+    margin-bottom: 20px;
   }
 
   .location h2 {
-    font-size: 1.5rem;
+    font-size: 1.4rem;
+  }
+
+  .country {
+    font-size: 0.85rem;
   }
 
   .weather-icon {
-    font-size: 3rem;
+    font-size: 2.8rem;
+  }
+
+  .weather-main {
+    margin-bottom: 25px;
+    padding: 15px 0;
   }
 
   .temp-value {
-    font-size: 3.5rem;
+    font-size: 3.2rem;
   }
 
   .temp-unit {
-    font-size: 2rem;
+    font-size: 1.8rem;
+    margin-top: 8px;
+  }
+
+  .description {
+    gap: 14px;
+    max-width: 100%;
   }
 
   .weather-desc {
-    font-size: 1rem;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    padding: 0 5px;
+  }
+
+  .feels-like-container {
+    padding-top: 14px;
+    gap: 5px;
   }
 
   .feels-like-label {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
   }
 
   .feels-like-value {
-    font-size: 1.2rem;
+    font-size: 1.15rem;
   }
 
   .weather-details {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
     gap: 10px;
+    margin-bottom: 20px;
   }
 
   .detail-item {
     padding: 12px;
+    border-radius: 14px;
+  }
+
+  .detail-label {
+    font-size: 0.8rem;
+    margin-bottom: 6px;
+  }
+
+  .detail-value {
+    font-size: 1.2rem;
+  }
+
+  .weather-footer {
+    padding-top: 15px;
+    margin-top: 15px;
+  }
+
+  .update-time {
+    font-size: 0.85rem;
+  }
+
+  .weekly-forecast {
+    padding: 0;
+    margin-top: 25px;
+    padding-top: 20px;
+  }
+
+  .weekly-title {
+    font-size: 0.9rem;
+    margin-bottom: 12px;
   }
 
   .weekly-items {
     grid-template-columns: repeat(4, 1fr);
     gap: 8px;
     max-width: 100%;
+    margin: 0 auto;
+    justify-items: center;
+    padding: 0 5px;
   }
 
   .weekly-item {
-    padding: 10px 6px;
-    min-height: 110px;
+    padding: 12px 8px;
+    min-height: 125px;
+    width: 100%;
+    max-width: 85px;
+    border-radius: 12px;
   }
 
   .weekly-day {
     font-size: 0.75rem;
+    margin-bottom: 4px;
   }
 
   .weekly-date {
     font-size: 0.65rem;
+    margin-bottom: 6px;
   }
 
   .weekly-icon {
-    min-height: 28px;
+    min-height: 30px;
+    margin: 6px 0;
+  }
+
+  .weekly-temp {
+    margin-top: 6px;
+    gap: 3px;
   }
 
   .weekly-temp-max {
@@ -401,6 +475,11 @@
 
   .weekly-temp-min {
     font-size: 0.75rem;
+  }
+
+  .weekly-pop {
+    font-size: 0.65rem;
+    margin-top: 5px;
   }
 }
 
