@@ -1,0 +1,375 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', 'Segoe UI', 'Roboto', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: linear-gradient(180deg, #f0f2f5 0%, #e5e8eb 100%);
+  background-attachment: fixed;
+  min-height: 100vh;
+  color: #1a1a1a;
+  position: relative;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: 
+    radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.8) 0%, transparent 40%),
+    radial-gradient(circle at 70% 80%, rgba(240, 242, 245, 0.6) 0%, transparent 40%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Güneşli hava durumu - Cartoon güneşli gökyüzü */
+body.weather-clear {
+  background: linear-gradient(180deg, #87CEEB 0%, #E0F6FF 40%, #FFE4B5 100%);
+}
+
+body.weather-clear::before {
+  /* Minimal cartoon güneş */
+  background: 
+    radial-gradient(circle at 20% 15%, rgba(255, 215, 0, 0.25) 0%, rgba(255, 165, 0, 0.1) 20%, transparent 35%),
+    radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.4) 0%, transparent 30%),
+    radial-gradient(ellipse at 50% 60%, rgba(144, 238, 144, 0.15) 0%, transparent 40%);
+  animation: cartoonSun 12s ease-in-out infinite;
+}
+
+body.weather-clear::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  /* Cartoon bulutlar */
+  background-image: 
+    radial-gradient(ellipse 120px 60px at 15% 25%, rgba(255, 255, 255, 0.8) 0%, transparent 50%),
+    radial-gradient(ellipse 100px 50px at 25% 30%, rgba(255, 255, 255, 0.7) 0%, transparent 50%),
+    radial-gradient(ellipse 80px 40px at 75% 20%, rgba(255, 255, 255, 0.6) 0%, transparent 50%),
+    radial-gradient(ellipse 90px 45px at 85% 25%, rgba(255, 255, 255, 0.7) 0%, transparent 50%);
+  background-repeat: no-repeat;
+  animation: cartoonClouds 20s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+@keyframes cartoonSun {
+  0%, 100% { 
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+  50% { 
+    transform: scale(1.05) rotate(3deg);
+    opacity: 0.98;
+  }
+}
+
+@keyframes cartoonClouds {
+  0%, 100% { 
+    transform: translateX(0);
+  }
+  50% { 
+    transform: translateX(30px);
+  }
+}
+
+/* Bulutlu hava durumu - Cartoon bulutlu gökyüzü */
+body.weather-clouds {
+  background: linear-gradient(180deg, #B0C4DE 0%, #D3D3D3 50%, #E6E6FA 100%);
+}
+
+body.weather-clouds::before {
+  /* Cartoon bulutlar */
+  background: 
+    radial-gradient(ellipse 150px 80px at 20% 20%, rgba(255, 255, 255, 0.9) 0%, transparent 60%),
+    radial-gradient(ellipse 120px 60px at 25% 25%, rgba(255, 255, 255, 0.8) 0%, transparent 60%),
+    radial-gradient(ellipse 100px 50px at 70% 15%, rgba(255, 255, 255, 0.85) 0%, transparent 55%),
+    radial-gradient(ellipse 130px 65px at 75% 20%, rgba(255, 255, 255, 0.75) 0%, transparent 60%),
+    radial-gradient(ellipse 110px 55px at 50% 30%, rgba(255, 255, 255, 0.7) 0%, transparent 50%);
+  animation: cartoonCloudsMove 25s ease-in-out infinite;
+}
+
+body.weather-clouds::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  /* Hafif güneş ışığı */
+  background: radial-gradient(circle at 30% 25%, rgba(255, 255, 200, 0.3) 0%, transparent 50%);
+  animation: cartoonSunlight 15s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+@keyframes cartoonCloudsMove {
+  0%, 100% { 
+    transform: translateX(0) translateY(0);
+  }
+  33% { 
+    transform: translateX(20px) translateY(-5px);
+  }
+  66% { 
+    transform: translateX(-15px) translateY(5px);
+  }
+}
+
+@keyframes cartoonSunlight {
+  0%, 100% { 
+    opacity: 0.3;
+  }
+  50% { 
+    opacity: 0.5;
+  }
+}
+
+/* Yağmurlu hava durumu - Cartoon yağmurlu gökyüzü */
+body.weather-rain {
+  background: linear-gradient(180deg, #708090 0%, #778899 50%, #696969 100%);
+}
+
+body.weather-rain::before {
+  /* Cartoon koyu bulutlar */
+  background: 
+    radial-gradient(ellipse 180px 100px at 20% 15%, rgba(105, 105, 105, 0.8) 0%, transparent 60%),
+    radial-gradient(ellipse 150px 80px at 25% 20%, rgba(112, 128, 144, 0.7) 0%, transparent 60%),
+    radial-gradient(ellipse 160px 90px at 70% 10%, rgba(105, 105, 105, 0.75) 0%, transparent 55%),
+    radial-gradient(ellipse 140px 75px at 75% 15%, rgba(112, 128, 144, 0.7) 0%, transparent 60%);
+  animation: cartoonRainClouds 20s ease-in-out infinite;
+}
+
+body.weather-rain::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  /* Cartoon yağmur damlaları */
+  background-image: 
+    linear-gradient(90deg, transparent 0%, rgba(173, 216, 230, 0.4) 2%, transparent 4%),
+    linear-gradient(90deg, transparent 0%, rgba(173, 216, 230, 0.35) 2%, transparent 4%),
+    linear-gradient(90deg, transparent 0%, rgba(173, 216, 230, 0.3) 2%, transparent 4%);
+  background-size: 8px 25px, 6px 30px, 10px 20px;
+  background-position: 0 0, 20px 10px, 40px 5px;
+  animation: cartoonRain 0.4s linear infinite;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.9;
+}
+
+@keyframes cartoonRainClouds {
+  0%, 100% { 
+    transform: translateX(0);
+  }
+  50% { 
+    transform: translateX(25px);
+  }
+}
+
+@keyframes cartoonRain {
+  0% { 
+    background-position: 0 0, 20px 10px, 40px 5px;
+  }
+  100% { 
+    background-position: 0 25px, 20px 40px, 40px 30px;
+  }
+}
+
+/* Karlı hava durumu - Cartoon karlı gökyüzü */
+body.weather-snow {
+  background: linear-gradient(180deg, #E6E6FA 0%, #D8BFD8 40%, #DDA0DD 100%);
+}
+
+body.weather-snow::before {
+  /* Cartoon karlı bulutlar */
+  background: 
+    radial-gradient(ellipse 160px 90px at 20% 18%, rgba(255, 255, 255, 0.9) 0%, transparent 60%),
+    radial-gradient(ellipse 140px 75px at 25% 22%, rgba(255, 255, 255, 0.85) 0%, transparent 60%),
+    radial-gradient(ellipse 150px 80px at 70% 15%, rgba(255, 255, 255, 0.9) 0%, transparent 55%),
+    radial-gradient(ellipse 130px 70px at 75% 20%, rgba(255, 255, 255, 0.8) 0%, transparent 60%);
+  animation: cartoonSnowClouds 22s ease-in-out infinite;
+}
+
+body.weather-snow::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  /* Cartoon kar taneleri - daha büyük ve yumuşak */
+  background-image: 
+    radial-gradient(circle, rgba(255, 255, 255, 1) 4px, transparent 4px),
+    radial-gradient(circle, rgba(255, 255, 255, 0.95) 3px, transparent 3px),
+    radial-gradient(circle, rgba(255, 255, 255, 0.9) 2.5px, transparent 2.5px),
+    radial-gradient(circle, rgba(255, 255, 255, 0.85) 2px, transparent 2px);
+  background-size: 120px 120px, 90px 90px, 110px 110px, 100px 100px;
+  background-position: 0 0, 35px 35px, 70px 70px, 105px 105px;
+  animation: cartoonSnow 25s linear infinite;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.95;
+}
+
+@keyframes cartoonSnowClouds {
+  0%, 100% { 
+    transform: translateX(0) translateY(0);
+  }
+  50% { 
+    transform: translateX(20px) translateY(-3px);
+  }
+}
+
+@keyframes cartoonSnow {
+  0% { 
+    background-position: 0 0, 35px 35px, 70px 70px, 105px 105px;
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(15px);
+  }
+  50% {
+    transform: translateX(-10px);
+  }
+  75% {
+    transform: translateX(12px);
+  }
+  100% { 
+    background-position: 0 100vh, 35px calc(100vh + 35px), 70px calc(100vh + 70px), 105px calc(100vh + 105px);
+    transform: translateX(0);
+  }
+}
+
+/* Sisli hava durumu - Cartoon sisli gökyüzü */
+body.weather-fog {
+  background: linear-gradient(180deg, #E8E8E8 0%, #DCDCDC 40%, #D3D3D3 80%, #C8C8C8 100%);
+}
+
+body.weather-fog::before {
+  /* Cartoon sis katmanları - daha yumuşak ve belirgin */
+  background: 
+    radial-gradient(ellipse 250px 120px at 25% 35%, rgba(255, 255, 255, 0.6) 0%, rgba(232, 232, 232, 0.4) 30%, transparent 65%),
+    radial-gradient(ellipse 220px 110px at 75% 45%, rgba(255, 255, 255, 0.55) 0%, rgba(220, 220, 220, 0.35) 30%, transparent 60%),
+    radial-gradient(ellipse 200px 100px at 50% 55%, rgba(255, 255, 255, 0.5) 0%, rgba(211, 211, 211, 0.3) 30%, transparent 55%),
+    radial-gradient(ellipse 180px 90px at 15% 60%, rgba(255, 255, 255, 0.45) 0%, rgba(200, 200, 200, 0.25) 30%, transparent 50%);
+  animation: cartoonFog 25s ease-in-out infinite;
+}
+
+body.weather-fog::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  /* Ek cartoon sis katmanları - daha yumuşak hareket */
+  background: 
+    radial-gradient(ellipse 200px 95px at 30% 50%, rgba(255, 255, 255, 0.4) 0%, rgba(232, 232, 232, 0.2) 25%, transparent 50%),
+    radial-gradient(ellipse 190px 90px at 70% 40%, rgba(255, 255, 255, 0.35) 0%, rgba(220, 220, 220, 0.2) 25%, transparent 50%),
+    radial-gradient(ellipse 170px 85px at 85% 55%, rgba(255, 255, 255, 0.3) 0%, rgba(211, 211, 211, 0.15) 25%, transparent 45%);
+  animation: cartoonFog2 30s ease-in-out infinite reverse;
+  pointer-events: none;
+  z-index: 0;
+}
+
+@keyframes cartoonFog {
+  0%, 100% { 
+    opacity: 0.7;
+    transform: translateX(0) translateY(0) scale(1);
+  }
+  33% { 
+    opacity: 0.8;
+    transform: translateX(30px) translateY(-8px) scale(1.03);
+  }
+  66% { 
+    opacity: 0.75;
+    transform: translateX(-25px) translateY(8px) scale(0.98);
+  }
+}
+
+@keyframes cartoonFog2 {
+  0%, 100% { 
+    opacity: 0.5;
+    transform: translateX(0) translateY(0);
+  }
+  50% { 
+    opacity: 0.65;
+    transform: translateX(-20px) translateY(12px);
+  }
+}
+
+/* Fırtınalı hava durumu - Cartoon fırtınalı gökyüzü */
+body.weather-thunderstorm {
+  background: linear-gradient(180deg, #2F4F4F 0%, #1C1C1C 50%, #000000 100%);
+}
+
+body.weather-thunderstorm::before {
+  /* Cartoon koyu fırtına bulutları */
+  background: 
+    radial-gradient(ellipse 200px 120px at 20% 10%, rgba(0, 0, 0, 0.8) 0%, transparent 60%),
+    radial-gradient(ellipse 180px 100px at 25% 15%, rgba(47, 79, 79, 0.7) 0%, transparent 60%),
+    radial-gradient(ellipse 190px 110px at 70% 8%, rgba(0, 0, 0, 0.75) 0%, transparent 55%),
+    radial-gradient(ellipse 170px 95px at 75% 12%, rgba(47, 79, 79, 0.7) 0%, transparent 60%),
+    radial-gradient(ellipse 160px 90px at 50% 18%, rgba(28, 28, 28, 0.6) 0%, transparent 50%);
+  animation: cartoonThunderClouds 15s ease-in-out infinite;
+}
+
+body.weather-thunderstorm::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  /* Cartoon şimşek efekti */
+  background: 
+    linear-gradient(90deg, transparent 0%, rgba(255, 255, 200, 0.1) 50%, transparent 100%),
+    linear-gradient(90deg, transparent 0%, rgba(255, 255, 150, 0.08) 50%, transparent 100%);
+  background-size: 100% 100%;
+  animation: cartoonLightning 3s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+@keyframes cartoonThunderClouds {
+  0%, 100% { 
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+  50% { 
+    transform: translateX(30px) scale(1.05);
+    opacity: 0.95;
+  }
+}
+
+@keyframes cartoonLightning {
+  0%, 90%, 100% { 
+    opacity: 0;
+  }
+  5%, 10% { 
+    opacity: 0.1;
+  }
+  15%, 20% { 
+    opacity: 0.15;
+  }
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+  position: relative;
+  z-index: 1;
+}
+

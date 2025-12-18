@@ -1,0 +1,265 @@
+// OpenWeatherMap API servisi
+// API Key'inizi https://openweathermap.org/api adresinden ücretsiz alabilirsiniz
+
+const API_KEY = import.meta.env.VITE_WEATHER_API_KEY || 'YOUR_API_KEY_HERE'
+const BASE_URL = 'https://api.openweathermap.org/data/2.5/weather'
+const FORECAST_URL = 'https://api.openweathermap.org/data/2.5/forecast'
+const DAILY_FORECAST_URL = 'https://api.openweathermap.org/data/2.5/forecast/daily'
+
+// Debug: API anahtarının okunup okunmadığını kontrol et
+console.log('API Key kontrol:', API_KEY ? 'Bulundu' : 'Bulunamadı')
+console.log('API Key uzunluk:', API_KEY?.length || 0)
+
+export const getWeatherData = async (cityName) => {
+  if (!API_KEY || API_KEY === 'YOUR_API_KEY_HERE' || API_KEY.trim() === '') {
+    throw new Error(
+      'API anahtarı bulunamadı. Lütfen .env dosyasına VITE_WEATHER_API_KEY değişkenini ekleyin ve dev server\'ı yeniden başlatın.'
+    )
+  }
+
+  try {
+    const response = await fetch(
+      `${BASE_URL}?q=${encodeURIComponent(cityName)}&appid=${API_KEY}&units=metric&lang=tr`
+    )
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error('Şehir bulunamadı. Lütfen şehir adını kontrol edin.')
+      } else if (response.status === 401) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(
+          `API anahtarı geçersiz veya aktif değil. Lütfen https://openweathermap.org/api adresinden yeni bir API anahtarı alın. Hata: ${errorData.message || 'Invalid API key'}`
+        )
+      } else {
+        throw new Error('Hava durumu bilgisi alınamadı. Lütfen daha sonra tekrar deneyin.')
+      }
+    }
+
+    const data = await response.json()
+    
+    // Forecast verilerini de al (yağmur ihtimali için)
+    try {
+      const forecastResponse = await fetch(
+        `${FORECAST_URL}?q=${encodeURIComponent(cityName)}&appid=${API_KEY}&units=metric&lang=tr&cnt=5`
+      )
+      if (forecastResponse.ok) {
+        const forecastData = await forecastResponse.json()
+        // Forecast verilerini ana veriye ekle
+        data.forecast = forecastData.list
+      }
+    } catch (forecastError) {
+      // Forecast hatası kritik değil, sadece logla
+      console.log('Forecast verisi alınamadı:', forecastError)
+    }
+    
+    // 7 günlük tahmin verilerini al
+    try {
+      // Daily forecast API'si ücretli plan gerektirebilir, bu yüzden hourly forecast'ten günlük verileri çıkarıyoruz
+      // Maksimum 40 veri alabiliriz (5 gün x 8 veri/gün), bugünün verisini de ekleyerek 7 günü tamamlıyoruz
+      const dailyForecastResponse = await fetch(
+        `${FORECAST_URL}?q=${encodeURIComponent(cityName)}&appid=${API_KEY}&units=metric&lang=tr&cnt=40`
+      )
+      if (dailyForecastResponse.ok) {
+        const dailyForecastData = await dailyForecastResponse.json()
+        // Her gün için bir veri seç (günlük ortalama) - bugünün verisini de ekle
+        const dailyData = getDailyForecast(dailyForecastData.list, data)
+        data.dailyForecast = dailyData
+      }
+    } catch (dailyError) {
+      console.log('7 günlük tahmin verisi alınamadı:', dailyError)
+    }
+    
+    return data
+  } catch (error) {
+    if (error.message) {
+      throw error
+    }
+    throw new Error('Bağlantı hatası. İnternet bağlantınızı kontrol edin.')
+  }
+}
+
+// Yağmur ihtimalini hesapla
+export const getPrecipitationProbability = (weather) => {
+  // Eğer forecast verisi varsa, ilk birkaç saat için ortalama pop değerini al
+  if (weather.forecast && weather.forecast.length > 0) {
+    const popValues = weather.forecast
+      .slice(0, 3) // İlk 3 saat
+      .map(item => item.pop || 0)
+      .filter(pop => pop > 0)
+    
+    if (popValues.length > 0) {
+      const avgPop = popValues.reduce((sum, pop) => sum + pop, 0) / popValues.length
+      return Math.round(avgPop * 100)
+    }
+  }
+  
+  // Forecast yoksa, mevcut duruma göre tahmin yap
+  const main = weather.weather[0].main
+  const clouds = weather.clouds?.all || 0
+  const humidity = weather.main.humidity
+  
+  if (main === 'Rain' || main === 'Drizzle' || main === 'Thunderstorm') {
+    return 90 // Zaten yağıyor
+  }
+  
+  if (main === 'Snow') {
+    return 85
+  }
+  
+  // Bulutlu ve nemli ise yağmur ihtimali yüksek
+  if (main === 'Clouds' && clouds > 70 && humidity > 70) {
+    return Math.min(70, Math.round((clouds + humidity) / 2))
+  }
+  
+  // Bulutlu ama nem düşük
+  if (main === 'Clouds' && clouds > 50) {
+    return Math.min(40, Math.round(clouds / 2))
+  }
+  
+  // Açık hava
+  return 0
+}
+
+// 7 günlük tahmin verilerini günlük olarak grupla
+function getDailyForecast(forecastList, currentWeather = null) {
+  if (!forecastList || forecastList.length === 0) return []
+  
+  const dailyMap = new Map()
+  
+  // Bugünün verisini de ekle (eğer varsa ve forecast'te yoksa)
+  if (currentWeather) {
+    const today = new Date(currentWeather.dt * 1000)
+    const todayKey = today.toDateString()
+    
+    // Eğer bugün forecast listesinde yoksa ekle
+    const todayInForecast = forecastList.some(item => {
+      const itemDate = new Date(item.dt * 1000)
+      return itemDate.toDateString() === todayKey
+    })
+    
+    if (!todayInForecast) {
+      dailyMap.set(todayKey, {
+        date: today,
+        temps: [currentWeather.main.temp],
+        weather: currentWeather.weather[0],
+        pop: 0,
+        tempMin: currentWeather.main.temp_min,
+        tempMax: currentWeather.main.temp_max
+      })
+    }
+  }
+  
+  forecastList.forEach(item => {
+    const date = new Date(item.dt * 1000)
+    const dayKey = date.toDateString()
+    
+    if (!dailyMap.has(dayKey)) {
+      dailyMap.set(dayKey, {
+        date: date,
+        temps: [],
+        weather: item.weather[0],
+        pop: item.pop || 0,
+        tempMin: item.main.temp,
+        tempMax: item.main.temp
+      })
+    }
+    
+    const dayData = dailyMap.get(dayKey)
+    dayData.temps.push(item.main.temp)
+    // Min/Max sıcaklıkları güncelle
+    if (item.main.temp < dayData.tempMin) {
+      dayData.tempMin = item.main.temp
+    }
+    if (item.main.temp > dayData.tempMax) {
+      dayData.tempMax = item.main.temp
+    }
+    // En yüksek pop değerini al
+    if (item.pop > dayData.pop) {
+      dayData.pop = item.pop
+      dayData.weather = item.weather[0]
+    }
+  })
+  
+  // Tarihe göre sırala
+  const sortedDays = Array.from(dailyMap.values())
+    .sort((a, b) => a.date - b.date)
+  
+  // Eğer 7 günden az varsa, son günlerin trend'ini kullanarak 7. günü ekle
+  let dailyForecast = sortedDays
+  if (sortedDays.length < 7 && sortedDays.length > 0) {
+    const lastDay = sortedDays[sortedDays.length - 1]
+    const lastDate = new Date(lastDay.date)
+    lastDate.setDate(lastDate.getDate() + 1)
+    
+    // Son günün ortalama sıcaklığını hesapla
+    const lastDayAvgTemp = lastDay.temps.reduce((a, b) => a + b, 0) / lastDay.temps.length
+    
+    // Eğer 2 veya daha fazla gün varsa, trend hesapla
+    let tempTrend = 0
+    let minTrend = 0
+    let maxTrend = 0
+    let popTrend = 0
+    
+    if (sortedDays.length >= 2) {
+      const secondLastDay = sortedDays[sortedDays.length - 2]
+      const secondLastAvgTemp = secondLastDay.temps.reduce((a, b) => a + b, 0) / secondLastDay.temps.length
+      
+      // Trend hesapla (son gün - önceki gün)
+      tempTrend = lastDayAvgTemp - secondLastAvgTemp
+      minTrend = lastDay.tempMin - secondLastDay.tempMin
+      maxTrend = lastDay.tempMax - secondLastDay.tempMax
+      popTrend = (lastDay.pop || 0) - (secondLastDay.pop || 0)
+    }
+    
+    // 7. günü trend'e göre tahmin et
+    const forecastAvgTemp = lastDayAvgTemp + (tempTrend * 0.7) // Trend'in %70'ini uygula
+    const forecastMinTemp = lastDay.tempMin + (minTrend * 0.7)
+    const forecastMaxTemp = lastDay.tempMax + (maxTrend * 0.7)
+    const forecastPop = Math.max(0, Math.min(1, (lastDay.pop || 0) + (popTrend * 0.5)))
+    
+    // Hava durumu için son gününkini kullan (daha iyi bir tahmin yapamayız)
+    dailyForecast = [
+      ...sortedDays,
+      {
+        date: lastDate,
+        temps: [forecastAvgTemp],
+        temp: forecastAvgTemp,
+        tempMin: forecastMinTemp,
+        tempMax: forecastMaxTemp,
+        weather: lastDay.weather,
+        pop: forecastPop
+      }
+    ]
+  }
+  
+  // İlk 7 günü al ve formatla
+  return dailyForecast
+    .slice(0, 7)
+    .map(day => {
+      // Ortalama sıcaklık hesapla
+      const avgTemp = day.temp || (day.temps && day.temps.length > 0 
+        ? day.temps.reduce((a, b) => a + b, 0) / day.temps.length 
+        : 0)
+      
+      // Min/Max sıcaklık hesapla
+      const minTemp = day.tempMin !== undefined 
+        ? day.tempMin 
+        : (day.temps && day.temps.length > 0 ? Math.min(...day.temps) : 0)
+      const maxTemp = day.tempMax !== undefined 
+        ? day.tempMax 
+        : (day.temps && day.temps.length > 0 ? Math.max(...day.temps) : 0)
+      
+      // Pop değeri 0-1 arası, yüzdeye çevir
+      const popPercent = day.pop !== undefined ? Math.round(day.pop * 100) : 0
+      
+      return {
+        date: day.date,
+        temp: Math.round(avgTemp),
+        tempMin: Math.round(minTemp),
+        tempMax: Math.round(maxTemp),
+        weather: day.weather,
+        pop: popPercent
+      }
+    })
+}
+
