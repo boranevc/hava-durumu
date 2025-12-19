@@ -5,6 +5,8 @@ const API_KEY = import.meta.env.VITE_WEATHER_API_KEY || 'YOUR_API_KEY_HERE'
 const BASE_URL = 'https://api.openweathermap.org/data/2.5/weather'
 const FORECAST_URL = 'https://api.openweathermap.org/data/2.5/forecast'
 const DAILY_FORECAST_URL = 'https://api.openweathermap.org/data/2.5/forecast/daily'
+const GEOCODING_URL = 'https://api.openweathermap.org/geo/1.0/direct'
+const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search'
 
 // Debug: API anahtarının okunup okunmadığını kontrol et
 console.log('API Key kontrol:', API_KEY ? 'Bulundu' : 'Bulunamadı')
@@ -118,6 +120,175 @@ export const getPrecipitationProbability = (weather) => {
   
   // Açık hava
   return 0
+}
+
+// Şehir önerilerini al - Nominatim API kullanarak (daha kapsamlı ve ücretsiz)
+export const getCitySuggestions = async (query) => {
+  if (!query || query.trim().length < 2) {
+    return []
+  }
+
+  try {
+    // Nominatim API - Ücretsiz ve sınırsız, daha kapsamlı sonuçlar
+    // Genel arama yap (featuretype kısıtlaması yok)
+    const response = await fetch(
+      `${NOMINATIM_URL}?q=${encodeURIComponent(query)}&format=json&limit=10&addressdetails=1&extratags=1`,
+      {
+        headers: {
+          'User-Agent': 'HavaDurumuApp/1.0' // Nominatim için User-Agent gerekli
+        }
+      }
+    )
+
+    if (!response.ok) {
+      // Nominatim başarısız olursa OpenWeatherMap'i dene
+      return await getCitySuggestionsFallback(query)
+    }
+
+    const data = await response.json()
+    
+    // Nominatim sonuçlarını formatla - daha esnek filtreleme
+    const suggestions = data
+      .map(item => {
+        const address = item.address || {}
+        const type = item.type || ''
+        const classType = item.class || ''
+        
+        // Şehir adını belirle - öncelik sırasına göre
+        let name = item.name || ''
+        if (!name || name.length === 0) {
+          name = address.city || address.town || address.village || address.municipality || address.county || ''
+        }
+        
+        // Eğer hala isim yoksa, display_name'den al
+        if (!name || name.length === 0) {
+          const displayName = item.display_name || ''
+          const parts = displayName.split(',')
+          if (parts.length > 0) {
+            name = parts[0].trim()
+          }
+        }
+        
+        let country = address.country || ''
+        // Ülke kodunu al (ISO 3166-1 alpha-2 formatı için)
+        const countryCode = address.country_code?.toUpperCase() || ''
+        const state = address.state || address.region || address.province || address.county || ''
+        
+        // Önem derecesi (importance) - daha önemli şehirler önce gelsin
+        const importance = item.importance || 0
+        
+        // OpenWeatherMap için uygun format: "city,country_code" veya sadece "city"
+        const searchQuery = countryCode 
+          ? `${name}, ${countryCode}`
+          : name
+        
+        return {
+          name: name,
+          country: country,
+          countryCode: countryCode,
+          state: state,
+          type: type,
+          classType: classType,
+          importance: importance,
+          fullName: state 
+            ? `${name}, ${state}, ${country}`
+            : `${name}, ${country}`,
+          displayName: state 
+            ? `${name}, ${state}`
+            : name,
+          searchQuery: searchQuery // OpenWeatherMap için optimize edilmiş format
+        }
+      })
+      .filter(item => {
+        // Geçerli şehir adı ve ülke olmalı
+        if (!item.name || item.name.length === 0 || !item.country) {
+          return false
+        }
+        
+        // Yerleşim yeri olmalı (çok katı filtreleme yapmıyoruz)
+        const type = item.type || ''
+        const classType = item.classType || ''
+        
+        // Kabul edilebilir tipler
+        const acceptableTypes = [
+          'city', 'town', 'village', 'municipality', 
+          'administrative', 'suburb', 'district', 'county'
+        ]
+        
+        return (
+          acceptableTypes.includes(type) || 
+          classType === 'place' ||
+          classType === 'boundary'
+        )
+      })
+      .sort((a, b) => {
+        // Önem derecesine göre sırala (yüksek önem önce)
+        return (b.importance || 0) - (a.importance || 0)
+      })
+      .slice(0, 5) // Maksimum 5 sonuç
+      .map(item => ({
+        name: item.name,
+        country: item.country,
+        countryCode: item.countryCode,
+        state: item.state,
+        fullName: item.fullName,
+        displayName: item.displayName,
+        searchQuery: item.searchQuery // OpenWeatherMap için optimize edilmiş format
+      }))
+
+    // Eğer Nominatim'den sonuç gelmezse OpenWeatherMap'i dene
+    if (suggestions.length === 0) {
+      return await getCitySuggestionsFallback(query)
+    }
+
+    return suggestions
+  } catch (error) {
+    console.log('Nominatim API hatası, OpenWeatherMap deneniyor:', error)
+    // Hata durumunda OpenWeatherMap'i dene
+    return await getCitySuggestionsFallback(query)
+  }
+}
+
+// OpenWeatherMap fallback (yedek)
+const getCitySuggestionsFallback = async (query) => {
+  if (!API_KEY || API_KEY === 'YOUR_API_KEY_HERE' || API_KEY.trim() === '') {
+    return []
+  }
+
+  try {
+    const response = await fetch(
+      `${GEOCODING_URL}?q=${encodeURIComponent(query)}&limit=5&appid=${API_KEY}`
+    )
+
+    if (!response.ok) {
+      return []
+    }
+
+    const data = await response.json()
+    return data.map(city => {
+      // OpenWeatherMap için optimize edilmiş format
+      const searchQuery = city.country 
+        ? `${city.name}, ${city.country}`
+        : city.name
+      
+      return {
+        name: city.name,
+        country: city.country,
+        countryCode: city.country, // OpenWeatherMap zaten ülke kodu döndürüyor
+        state: city.state,
+        fullName: city.state 
+          ? `${city.name}, ${city.state}, ${city.country}`
+          : `${city.name}, ${city.country}`,
+        displayName: city.state 
+          ? `${city.name}, ${city.state}`
+          : city.name,
+        searchQuery: searchQuery // OpenWeatherMap için optimize edilmiş format
+      }
+    })
+  } catch (error) {
+    console.log('OpenWeatherMap fallback hatası:', error)
+    return []
+  }
 }
 
 // 7 günlük tahmin verilerini günlük olarak grupla

@@ -1,7 +1,11 @@
+.search-container {
+  position: relative;
+  margin-bottom: 20px;
+}
+
 .search-bar {
   display: flex;
   gap: 12px;
-  margin-bottom: 20px;
   background: rgba(255, 255, 255, 0.25);
   backdrop-filter: blur(50px) saturate(180%);
   -webkit-backdrop-filter: blur(50px) saturate(180%);
@@ -111,11 +115,83 @@
   cursor: not-allowed;
 }
 
+.suggestions-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 8px;
+  background: rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(50px) saturate(180%);
+  -webkit-backdrop-filter: blur(50px) saturate(180%);
+  border: 0.5px solid rgba(255, 255, 255, 0.4);
+  border-radius: 16px;
+  box-shadow: 
+    0 20px 60px rgba(0, 0, 0, 0.12),
+    0 8px 24px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.03);
+  overflow: hidden;
+  z-index: 1000;
+  max-height: 300px;
+  overflow-y: auto;
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.suggestion-item {
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  border-bottom: 0.5px solid rgba(0, 0, 0, 0.05);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.suggestion-item:last-child {
+  border-bottom: none;
+}
+
+.suggestion-item:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.suggestion-item:active {
+  background: rgba(255, 255, 255, 0.5);
+  transform: scale(0.98);
+}
+
+.suggestion-name {
+  font-size: 1rem;
+  color: #1a1a1a;
+  font-weight: 500;
+}
+
+.suggestion-location {
+  font-size: 0.85rem;
+  color: #718096;
+  font-weight: 400;
+}
+
 @media (max-width: 768px) {
+  .search-container {
+    margin-bottom: 25px;
+  }
+
   .search-bar {
     padding: 10px;
     gap: 8px;
-    margin-bottom: 25px;
   }
 
   .search-input {
@@ -127,6 +203,23 @@
     padding: 12px 16px;
     font-size: 1.1rem;
     min-width: 50px;
+  }
+
+  .suggestions-list {
+    border-radius: 14px;
+    margin-top: 6px;
+  }
+
+  .suggestion-item {
+    padding: 10px 14px;
+  }
+
+  .suggestion-name {
+    font-size: 0.95rem;
+  }
+
+  .suggestion-location {
+    font-size: 0.8rem;
   }
 }
 
