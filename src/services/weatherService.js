@@ -307,17 +307,37 @@ export const getCitySuggestions = async (query) => {
     return []
   }
 
-  try {
-    // Nominatim API - Ücretsiz ve sınırsız, daha kapsamlı sonuçlar
-    // Genel arama yap (featuretype kısıtlaması yok)
-    const response = await fetch(
-      `${NOMINATIM_URL}?q=${encodeURIComponent(query)}&format=json&limit=10&addressdetails=1&extratags=1`,
-      {
-        headers: {
-          'User-Agent': 'HavaDurumuApp/1.0' // Nominatim için User-Agent gerekli
+  // Cache kontrolü - şehir önerileri için
+  const suggestionCacheKey = `suggestions_${query.toLowerCase()}`
+  const cachedSuggestions = getCachedData(suggestionCacheKey, false)
+  if (cachedSuggestions) {
+    return cachedSuggestions
+  }
+
+  // Eğer aynı query için zaten bir istek bekliyorsa, o isteği bekle
+  if (pendingRequests.has(suggestionCacheKey)) {
+    return pendingRequests.get(suggestionCacheKey)
+  }
+
+  // Request promise'ını oluştur
+  const suggestionPromise = (async () => {
+    try {
+      // Nominatim API - Ücretsiz ve sınırsız, daha kapsamlı sonuçlar
+      // Genel arama yap (featuretype kısıtlaması yok)
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 8000) // 8 saniye timeout
+      
+      const response = await fetch(
+        `${NOMINATIM_URL}?q=${encodeURIComponent(query)}&format=json&limit=10&addressdetails=1&extratags=1`,
+        {
+          headers: {
+            'User-Agent': 'HavaDurumuApp/1.0' // Nominatim için User-Agent gerekli
+          },
+          signal: controller.signal
         }
-      }
-    )
+      )
+      
+      clearTimeout(timeout)
 
     if (!response.ok) {
       // Nominatim başarısız olursa OpenWeatherMap'i dene
@@ -415,17 +435,47 @@ export const getCitySuggestions = async (query) => {
         searchQuery: item.searchQuery // OpenWeatherMap için optimize edilmiş format
       }))
 
-    // Eğer Nominatim'den sonuç gelmezse OpenWeatherMap'i dene
-    if (suggestions.length === 0) {
-      return await getCitySuggestionsFallback(query)
-    }
+      // Eğer Nominatim'den sonuç gelmezse OpenWeatherMap'i dene
+      if (suggestions.length === 0) {
+        const fallbackResults = await getCitySuggestionsFallback(query)
+        if (fallbackResults.length > 0) {
+          // Cache'e kaydet
+          setCachedData(suggestionCacheKey, fallbackResults, false)
+          return fallbackResults
+        }
+        return []
+      }
 
-    return suggestions
-  } catch (error) {
-    console.log('Nominatim API hatası, OpenWeatherMap deneniyor:', error)
-    // Hata durumunda OpenWeatherMap'i dene
-    return await getCitySuggestionsFallback(query)
-  }
+      // Cache'e kaydet (1 saat TTL - öneriler için)
+      setCachedData(suggestionCacheKey, suggestions, false)
+      return suggestions
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        console.log('Suggestions request timeout')
+        return []
+      }
+      console.log('Nominatim API hatası, OpenWeatherMap deneniyor:', error)
+      // Hata durumunda OpenWeatherMap'i dene
+      try {
+        const fallbackResults = await getCitySuggestionsFallback(query)
+        if (fallbackResults.length > 0) {
+          setCachedData(suggestionCacheKey, fallbackResults, false)
+          return fallbackResults
+        }
+      } catch (fallbackError) {
+        console.log('Fallback hatası:', fallbackError)
+      }
+      return []
+    } finally {
+      // Request tamamlandı, queue'dan çıkar
+      pendingRequests.delete(suggestionCacheKey)
+    }
+  })()
+
+  // Promise'ı queue'ya ekle
+  pendingRequests.set(suggestionCacheKey, suggestionPromise)
+  
+  return suggestionPromise
 }
 
 // OpenWeatherMap fallback (yedek)

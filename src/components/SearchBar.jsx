@@ -50,7 +50,8 @@ function SearchBar({ onSearch, loading }) {
       }
     }
 
-    const debounceTimer = setTimeout(fetchSuggestions, 300)
+    // Debounce süresini artırdık (300ms -> 500ms) - daha az API çağrısı
+    const debounceTimer = setTimeout(fetchSuggestions, 500)
     return () => clearTimeout(debounceTimer)
   }, [input])
 
