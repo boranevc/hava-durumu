@@ -10,8 +10,11 @@ const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search'
 
 // Cache için basit bir Map
 const cache = new Map()
-const CACHE_TTL = 10 * 60 * 1000 // 10 dakika (mevcut hava durumu için)
+const CACHE_TTL = 30 * 60 * 1000 // 30 dakika (mevcut hava durumu için - daha uzun cache)
 const DAILY_CACHE_TTL = 3 * 60 * 60 * 1000 // 3 saat (7 günlük tahmin için - API her 3 saatte bir güncelliyor)
+
+// Request queue - aynı şehir için bekleyen istekleri birleştir
+const pendingRequests = new Map()
 
 // Debug: API anahtarının okunup okunmadığını kontrol et
 console.log('API Key kontrol:', API_KEY ? 'Bulundu' : 'Bulunamadı')
@@ -82,75 +85,114 @@ export const getWeatherData = async (cityName) => {
     }
   }
 
-  try {
-    const response = await fetch(
-      `${BASE_URL}?q=${encodeURIComponent(cityName)}&appid=${API_KEY}&units=metric&lang=tr`
-    )
-
-    if (!response.ok) {
-      if (response.status === 404) {
-        throw new Error('Şehir bulunamadı. Lütfen şehir adını kontrol edin.')
-      } else if (response.status === 401) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(
-          `API anahtarı geçersiz veya aktif değil. Lütfen https://openweathermap.org/api adresinden yeni bir API anahtarı alın. Hata: ${errorData.message || 'Invalid API key'}`
-        )
-      } else if (response.status === 429) {
-        // Rate limit hatası
-        throw new Error('Çok fazla istek yapıldı. Lütfen birkaç dakika sonra tekrar deneyin. (Rate limit aşıldı)')
-      } else {
-        throw new Error('Hava durumu bilgisi alınamadı. Lütfen daha sonra tekrar deneyin.')
-      }
-    }
-
-    const data = await response.json()
-    
-    // Forecast verilerini de al (yağmur ihtimali için)
-    try {
-      const forecastResponse = await fetch(
-        `${FORECAST_URL}?q=${encodeURIComponent(cityName)}&appid=${API_KEY}&units=metric&lang=tr&cnt=5`
-      )
-      if (forecastResponse.ok) {
-        const forecastData = await forecastResponse.json()
-        // Forecast verilerini ana veriye ekle
-        data.forecast = forecastData.list
-      } else if (forecastResponse.status === 429) {
-        console.log('Forecast rate limit - atlanıyor')
-      }
-    } catch (forecastError) {
-      // Forecast hatası kritik değil, sadece logla
-      console.log('Forecast verisi alınamadı:', forecastError)
-    }
-    
-    // 7 günlük tahmin verilerini al
-    try {
-      // Daily forecast API'si ücretli plan gerektirebilir, bu yüzden hourly forecast'ten günlük verileri çıkarıyoruz
-      // Maksimum 40 veri alabiliriz (5 gün x 8 veri/gün), bugünün verisini de ekleyerek 7 günü tamamlıyoruz
-      const dailyForecastResponse = await fetch(
-        `${FORECAST_URL}?q=${encodeURIComponent(cityName)}&appid=${API_KEY}&units=metric&lang=tr&cnt=40`
-      )
-      if (dailyForecastResponse.ok) {
-        const dailyForecastData = await dailyForecastResponse.json()
-        // Her gün için bir veri seç (günlük ortalama) - bugünün verisini de ekle
-        const dailyData = getDailyForecast(dailyForecastData.list, data)
-        data.dailyForecast = dailyData
-      } else if (dailyForecastResponse.status === 429) {
-        console.log('Daily forecast rate limit - atlanıyor')
-      }
-    } catch (dailyError) {
-      console.log('7 günlük tahmin verisi alınamadı:', dailyError)
-    }
-    
-    // Cache'e kaydet - bugünün tarihi ile
-    setCachedData(cacheKey, data, true) // 7 günlük tahmin için günlük cache
-    
-    return data
-  } catch (error) {
-    if (error.message) {
-      throw error
-    }
-    throw new Error('Bağlantı hatası. İnternet bağlantınızı kontrol edin.')
+  // Eğer aynı şehir için zaten bir istek bekliyorsa, o isteği bekle (request queuing)
+  if (pendingRequests.has(cacheKey)) {
+    return pendingRequests.get(cacheKey)
   }
+
+  // Request promise'ını queue'ya ekle
+  const requestPromise = (async () => {
+    try {
+      // Rate limit durumunda retry mekanizması
+      let retries = 0
+      const maxRetries = 2
+      let response
+      
+      while (retries <= maxRetries) {
+        response = await fetch(
+          `${BASE_URL}?q=${encodeURIComponent(cityName)}&appid=${API_KEY}&units=metric&lang=tr`
+        )
+
+        if (response.ok) {
+          break // Başarılı, döngüden çık
+        }
+
+        if (response.status === 429 && retries < maxRetries) {
+          // Rate limit - bekleyip tekrar dene
+          const retryDelay = (retries + 1) * 2000 // 2s, 4s
+          console.log(`Rate limit - ${retryDelay}ms sonra tekrar deneniyor...`)
+          await new Promise(resolve => setTimeout(resolve, retryDelay))
+          retries++
+          continue
+        }
+
+        // Diğer hatalar için döngüden çık
+        break
+      }
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error('Şehir bulunamadı. Lütfen şehir adını kontrol edin.')
+        } else if (response.status === 401) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(
+            `API anahtarı geçersiz veya aktif değil. Lütfen https://openweathermap.org/api adresinden yeni bir API anahtarı alın. Hata: ${errorData.message || 'Invalid API key'}`
+          )
+        } else if (response.status === 429) {
+          // Rate limit hatası - tüm retry'lar başarısız
+          throw new Error('Çok fazla istek yapıldı. Lütfen birkaç dakika sonra tekrar deneyin. (Rate limit aşıldı)')
+        } else {
+          throw new Error('Hava durumu bilgisi alınamadı. Lütfen daha sonra tekrar deneyin.')
+        }
+      }
+
+      const data = await response.json()
+      
+      // Forecast verilerini de al (yağmur ihtimali için)
+      try {
+        const forecastResponse = await fetch(
+          `${FORECAST_URL}?q=${encodeURIComponent(cityName)}&appid=${API_KEY}&units=metric&lang=tr&cnt=5`
+        )
+        if (forecastResponse.ok) {
+          const forecastData = await forecastResponse.json()
+          // Forecast verilerini ana veriye ekle
+          data.forecast = forecastData.list
+        } else if (forecastResponse.status === 429) {
+          console.log('Forecast rate limit - atlanıyor')
+        }
+      } catch (forecastError) {
+        // Forecast hatası kritik değil, sadece logla
+        console.log('Forecast verisi alınamadı:', forecastError)
+      }
+      
+      // 7 günlük tahmin verilerini al
+      try {
+        // Daily forecast API'si ücretli plan gerektirebilir, bu yüzden hourly forecast'ten günlük verileri çıkarıyoruz
+        // Maksimum 40 veri alabiliriz (5 gün x 8 veri/gün), bugünün verisini de ekleyerek 7 günü tamamlıyoruz
+        const dailyForecastResponse = await fetch(
+          `${FORECAST_URL}?q=${encodeURIComponent(cityName)}&appid=${API_KEY}&units=metric&lang=tr&cnt=40`
+        )
+        if (dailyForecastResponse.ok) {
+          const dailyForecastData = await dailyForecastResponse.json()
+          // Her gün için bir veri seç (günlük ortalama) - bugünün verisini de ekle
+          const dailyData = getDailyForecast(dailyForecastData.list, data)
+          data.dailyForecast = dailyData
+        } else if (dailyForecastResponse.status === 429) {
+          console.log('Daily forecast rate limit - atlanıyor')
+        }
+      } catch (dailyError) {
+        console.log('7 günlük tahmin verisi alınamadı:', dailyError)
+      }
+      
+      // Cache'e kaydet - bugünün tarihi ile
+      setCachedData(cacheKey, data, true) // 7 günlük tahmin için günlük cache
+      
+      return data
+    } catch (error) {
+      if (error.message) {
+        throw error
+      }
+      throw new Error('Bağlantı hatası. İnternet bağlantınızı kontrol edin.')
+    } finally {
+      // Request tamamlandı, queue'dan çıkar
+      pendingRequests.delete(cacheKey)
+    }
+  })()
+
+  // Promise'ı queue'ya ekle
+  pendingRequests.set(cacheKey, requestPromise)
+  
+  return requestPromise
 }
 
 // Yağmur ihtimalini hesapla
