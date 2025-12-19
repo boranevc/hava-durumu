@@ -95,29 +95,61 @@ export const getWeatherData = async (cityName) => {
     try {
       // Rate limit durumunda retry mekanizması
       let retries = 0
-      const maxRetries = 2
+      const maxRetries = 3
       let response
+      const timeout = 15000 // 15 saniye timeout
       
       while (retries <= maxRetries) {
-        response = await fetch(
-          `${BASE_URL}?q=${encodeURIComponent(cityName)}&appid=${API_KEY}&units=metric&lang=tr`
-        )
+        try {
+          // Timeout ile fetch
+          const controller = new AbortController()
+          const timeoutId = setTimeout(() => controller.abort(), timeout)
+          
+          response = await fetch(
+            `${BASE_URL}?q=${encodeURIComponent(cityName)}&appid=${API_KEY}&units=metric&lang=tr`,
+            {
+              signal: controller.signal,
+              headers: {
+                'Accept': 'application/json',
+              }
+            }
+          )
+          
+          clearTimeout(timeoutId)
 
-        if (response.ok) {
-          break // Başarılı, döngüden çık
+          if (response.ok) {
+            break // Başarılı, döngüden çık
+          }
+
+          if (response.status === 429 && retries < maxRetries) {
+            // Rate limit - bekleyip tekrar dene (exponential backoff)
+            const retryDelay = Math.min((retries + 1) * 3000, 10000) // 3s, 6s, 9s (max 10s)
+            console.log(`Rate limit - ${retryDelay}ms sonra tekrar deneniyor...`)
+            await new Promise(resolve => setTimeout(resolve, retryDelay))
+            retries++
+            continue
+          }
+
+          // Diğer hatalar için döngüden çık
+          break
+        } catch (fetchError) {
+          // Network hatası veya timeout
+          if (fetchError.name === 'AbortError') {
+            console.log('Request timeout - tekrar deneniyor...')
+          } else {
+            console.log('Network hatası:', fetchError.message)
+          }
+          
+          if (retries < maxRetries) {
+            const retryDelay = Math.min((retries + 1) * 2000, 8000) // 2s, 4s, 6s (max 8s)
+            await new Promise(resolve => setTimeout(resolve, retryDelay))
+            retries++
+            continue
+          }
+          
+          // Tüm retry'lar başarısız
+          throw new Error('Bağlantı hatası. İnternet bağlantınızı kontrol edin ve birkaç saniye sonra tekrar deneyin.')
         }
-
-        if (response.status === 429 && retries < maxRetries) {
-          // Rate limit - bekleyip tekrar dene
-          const retryDelay = (retries + 1) * 2000 // 2s, 4s
-          console.log(`Rate limit - ${retryDelay}ms sonra tekrar deneniyor...`)
-          await new Promise(resolve => setTimeout(resolve, retryDelay))
-          retries++
-          continue
-        }
-
-        // Diğer hatalar için döngüden çık
-        break
       }
 
       if (!response.ok) {
@@ -138,11 +170,23 @@ export const getWeatherData = async (cityName) => {
 
       const data = await response.json()
       
-      // Forecast verilerini de al (yağmur ihtimali için)
+      // Forecast verilerini de al (yağmur ihtimali için) - timeout ile
       try {
+        const forecastController = new AbortController()
+        const forecastTimeout = setTimeout(() => forecastController.abort(), 10000) // 10 saniye
+        
         const forecastResponse = await fetch(
-          `${FORECAST_URL}?q=${encodeURIComponent(cityName)}&appid=${API_KEY}&units=metric&lang=tr&cnt=5`
+          `${FORECAST_URL}?q=${encodeURIComponent(cityName)}&appid=${API_KEY}&units=metric&lang=tr&cnt=5`,
+          {
+            signal: forecastController.signal,
+            headers: {
+              'Accept': 'application/json',
+            }
+          }
         )
+        
+        clearTimeout(forecastTimeout)
+        
         if (forecastResponse.ok) {
           const forecastData = await forecastResponse.json()
           // Forecast verilerini ana veriye ekle
@@ -152,16 +196,28 @@ export const getWeatherData = async (cityName) => {
         }
       } catch (forecastError) {
         // Forecast hatası kritik değil, sadece logla
-        console.log('Forecast verisi alınamadı:', forecastError)
+        console.log('Forecast verisi alınamadı:', forecastError.message || forecastError)
       }
       
-      // 7 günlük tahmin verilerini al
+      // 7 günlük tahmin verilerini al - timeout ile
       try {
         // Daily forecast API'si ücretli plan gerektirebilir, bu yüzden hourly forecast'ten günlük verileri çıkarıyoruz
         // Maksimum 40 veri alabiliriz (5 gün x 8 veri/gün), bugünün verisini de ekleyerek 7 günü tamamlıyoruz
+        const dailyForecastController = new AbortController()
+        const dailyForecastTimeout = setTimeout(() => dailyForecastController.abort(), 10000) // 10 saniye
+        
         const dailyForecastResponse = await fetch(
-          `${FORECAST_URL}?q=${encodeURIComponent(cityName)}&appid=${API_KEY}&units=metric&lang=tr&cnt=40`
+          `${FORECAST_URL}?q=${encodeURIComponent(cityName)}&appid=${API_KEY}&units=metric&lang=tr&cnt=40`,
+          {
+            signal: dailyForecastController.signal,
+            headers: {
+              'Accept': 'application/json',
+            }
+          }
         )
+        
+        clearTimeout(dailyForecastTimeout)
+        
         if (dailyForecastResponse.ok) {
           const dailyForecastData = await dailyForecastResponse.json()
           // Her gün için bir veri seç (günlük ortalama) - bugünün verisini de ekle
@@ -171,7 +227,7 @@ export const getWeatherData = async (cityName) => {
           console.log('Daily forecast rate limit - atlanıyor')
         }
       } catch (dailyError) {
-        console.log('7 günlük tahmin verisi alınamadı:', dailyError)
+        console.log('7 günlük tahmin verisi alınamadı:', dailyError.message || dailyError)
       }
       
       // Cache'e kaydet - bugünün tarihi ile
