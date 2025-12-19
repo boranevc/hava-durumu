@@ -156,17 +156,20 @@ body.weather-clouds::after {
 
 /* Yağmurlu hava durumu - Cartoon yağmurlu gökyüzü */
 body.weather-rain {
-  background: linear-gradient(180deg, #708090 0%, #778899 50%, #696969 100%);
+  background: linear-gradient(180deg, #9FB5C8 0%, #8FA5B8 25%, #7F95A8 50%, #6F8598 60%, #5F7588 100%);
 }
 
 body.weather-rain::before {
-  /* Cartoon koyu bulutlar */
+  /* Yağmurlu bulutlar - yazıların okunabilirliği için daha açık */
   background: 
-    radial-gradient(ellipse 180px 100px at 20% 15%, rgba(105, 105, 105, 0.8) 0%, transparent 60%),
-    radial-gradient(ellipse 150px 80px at 25% 20%, rgba(112, 128, 144, 0.7) 0%, transparent 60%),
-    radial-gradient(ellipse 160px 90px at 70% 10%, rgba(105, 105, 105, 0.75) 0%, transparent 55%),
-    radial-gradient(ellipse 140px 75px at 75% 15%, rgba(112, 128, 144, 0.7) 0%, transparent 60%);
+    radial-gradient(ellipse 280px 150px at 10% 8%, rgba(100, 110, 120, 0.5) 0%, rgba(110, 120, 130, 0.35) 30%, rgba(120, 130, 140, 0.25) 50%, transparent 75%),
+    radial-gradient(ellipse 260px 140px at 15% 15%, rgba(105, 115, 125, 0.45) 0%, rgba(115, 125, 135, 0.3) 30%, rgba(125, 135, 145, 0.2) 50%, transparent 70%),
+    radial-gradient(ellipse 300px 160px at 60% 5%, rgba(95, 105, 115, 0.55) 0%, rgba(105, 115, 125, 0.4) 30%, rgba(115, 125, 135, 0.3) 50%, transparent 75%),
+    radial-gradient(ellipse 270px 145px at 65% 12%, rgba(100, 110, 120, 0.5) 0%, rgba(110, 120, 130, 0.35) 30%, rgba(120, 130, 140, 0.25) 50%, transparent 70%),
+    radial-gradient(ellipse 250px 135px at 40% 8%, rgba(110, 120, 130, 0.4) 0%, rgba(120, 130, 140, 0.3) 30%, rgba(130, 140, 150, 0.2) 50%, transparent 65%),
+    radial-gradient(ellipse 240px 130px at 85% 10%, rgba(98, 108, 118, 0.48) 0%, rgba(108, 118, 128, 0.33) 30%, rgba(118, 128, 138, 0.23) 50%, transparent 68%);
   animation: cartoonRainClouds 20s ease-in-out infinite;
+  opacity: 0.5;
 }
 
 body.weather-rain::after {
@@ -176,17 +179,13 @@ body.weather-rain::after {
   left: 0;
   width: 100%;
   height: 100%;
-  /* Cartoon yağmur damlaları */
-  background-image: 
-    linear-gradient(90deg, transparent 0%, rgba(173, 216, 230, 0.4) 2%, transparent 4%),
-    linear-gradient(90deg, transparent 0%, rgba(173, 216, 230, 0.35) 2%, transparent 4%),
-    linear-gradient(90deg, transparent 0%, rgba(173, 216, 230, 0.3) 2%, transparent 4%);
-  background-size: 8px 25px, 6px 30px, 10px 20px;
-  background-position: 0 0, 20px 10px, 40px 5px;
-  animation: cartoonRain 0.4s linear infinite;
+  /* Yağmurlu hava atmosferi - çok hafif sis efekti */
+  background: 
+    radial-gradient(ellipse 100% 40% at 50% 60%, rgba(110, 120, 130, 0.08) 0%, transparent 60%),
+    linear-gradient(180deg, transparent 0%, rgba(100, 110, 120, 0.05) 50%, rgba(90, 100, 110, 0.08) 100%);
   pointer-events: none;
   z-index: 0;
-  opacity: 0.9;
+  opacity: 1;
 }
 
 @keyframes cartoonRainClouds {
@@ -200,10 +199,10 @@ body.weather-rain::after {
 
 @keyframes cartoonRain {
   0% { 
-    background-position: 0 0, 20px 10px, 40px 5px;
+    background-position: 0 0, 40px 30px, 80px 20px, 120px 35px;
   }
   100% { 
-    background-position: 0 25px, 20px 40px, 40px 30px;
+    background-position: 0 80px, 40px 110px, 80px 100px, 120px 115px;
   }
 }
 
