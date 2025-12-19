@@ -8,10 +8,10 @@ const DAILY_FORECAST_URL = 'https://api.openweathermap.org/data/2.5/forecast/dai
 const GEOCODING_URL = 'https://api.openweathermap.org/geo/1.0/direct'
 const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search'
 
-// Cache için basit bir Map
-const cache = new Map()
-const CACHE_TTL = 30 * 60 * 1000 // 30 dakika (mevcut hava durumu için - daha uzun cache)
+// Cache için localStorage kullan (cihazlar arası paylaşım için)
+const CACHE_TTL = 60 * 60 * 1000 // 1 saat (mevcut hava durumu için - çok daha uzun cache)
 const DAILY_CACHE_TTL = 3 * 60 * 60 * 1000 // 3 saat (7 günlük tahmin için - API her 3 saatte bir güncelliyor)
+const CACHE_PREFIX = 'weather_cache_'
 
 // Request queue - aynı şehir için bekleyen istekleri birleştir
 const pendingRequests = new Map()
@@ -26,42 +26,67 @@ const getTodayKey = () => {
   return `${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`
 }
 
-// Cache kontrolü - günlük cache kontrolü ile
+// Cache kontrolü - localStorage ile (cihazlar arası paylaşım)
 const getCachedData = (key, isDailyForecast = false) => {
-  const cached = cache.get(key)
-  if (!cached) return null
-  
-  const now = Date.now()
-  const ttl = isDailyForecast ? DAILY_CACHE_TTL : CACHE_TTL
-  
-  // Günlük tahmin için: Eğer bugünün cache'i varsa ve TTL içindeyse kullan
-  if (isDailyForecast) {
-    const todayKey = getTodayKey()
-    if (cached.dateKey === todayKey && now - cached.timestamp < ttl) {
+  try {
+    const storageKey = `${CACHE_PREFIX}${key}`
+    const cachedStr = localStorage.getItem(storageKey)
+    if (!cachedStr) return null
+    
+    const cached = JSON.parse(cachedStr)
+    const now = Date.now()
+    const ttl = isDailyForecast ? DAILY_CACHE_TTL : CACHE_TTL
+    
+    // Günlük tahmin için: Eğer bugünün cache'i varsa ve TTL içindeyse kullan
+    if (isDailyForecast) {
+      const todayKey = getTodayKey()
+      if (cached.dateKey === todayKey && now - cached.timestamp < ttl) {
+        return cached.data
+      }
+      // Eğer farklı bir günse veya TTL dolmuşsa cache'i temizle
+      localStorage.removeItem(storageKey)
+      return null
+    }
+    
+    // Normal cache kontrolü
+    if (now - cached.timestamp < ttl) {
       return cached.data
     }
-    // Eğer farklı bir günse veya TTL dolmuşsa cache'i temizle
-    cache.delete(key)
+    
+    localStorage.removeItem(storageKey)
+    return null
+  } catch (error) {
+    console.log('Cache okuma hatası:', error)
     return null
   }
-  
-  // Normal cache kontrolü
-  if (now - cached.timestamp < ttl) {
-    return cached.data
-  }
-  
-  cache.delete(key)
-  return null
 }
 
-// Cache'e kaydet - günlük cache ile
+// Cache'e kaydet - localStorage ile (cihazlar arası paylaşım)
 const setCachedData = (key, data, isDailyForecast = false) => {
-  const todayKey = getTodayKey()
-  cache.set(key, {
-    data,
-    timestamp: Date.now(),
-    dateKey: todayKey // Hangi güne ait olduğunu kaydet
-  })
+  try {
+    const todayKey = getTodayKey()
+    const storageKey = `${CACHE_PREFIX}${key}`
+    const cacheData = {
+      data,
+      timestamp: Date.now(),
+      dateKey: todayKey // Hangi güne ait olduğunu kaydet
+    }
+    localStorage.setItem(storageKey, JSON.stringify(cacheData))
+  } catch (error) {
+    console.log('Cache yazma hatası:', error)
+    // localStorage dolu olabilir, eski cache'leri temizle
+    try {
+      const keys = Object.keys(localStorage)
+      keys.filter(k => k.startsWith(CACHE_PREFIX)).forEach(k => {
+        const cached = JSON.parse(localStorage.getItem(k))
+        if (Date.now() - cached.timestamp > CACHE_TTL) {
+          localStorage.removeItem(k)
+        }
+      })
+    } catch (cleanError) {
+      console.log('Cache temizleme hatası:', cleanError)
+    }
+  }
 }
 
 export const getWeatherData = async (cityName) => {
@@ -79,9 +104,17 @@ export const getWeatherData = async (cityName) => {
   const cachedData = getCachedData(cacheKey, false)
   if (cachedData) {
     // Eğer cache'deki veri bugünün verisi değilse, günlük tahmin için yeniden istek yap
-    const cachedDateKey = cache.get(cacheKey)?.dateKey
-    if (cachedDateKey === todayKey) {
-      return cachedData
+    try {
+      const storageKey = `${CACHE_PREFIX}${cacheKey}`
+      const cachedStr = localStorage.getItem(storageKey)
+      if (cachedStr) {
+        const cached = JSON.parse(cachedStr)
+        if (cached.dateKey === todayKey) {
+          return cachedData
+        }
+      }
+    } catch (error) {
+      // Cache okuma hatası, devam et
     }
   }
 
@@ -170,13 +203,15 @@ export const getWeatherData = async (cityName) => {
 
       const data = await response.json()
       
-      // Forecast verilerini de al (yağmur ihtimali için) - timeout ile
+      // Forecast verilerini de al (yağmur ihtimali için) - sadece 1 istek (40 veri hem forecast hem daily için yeterli)
+      // Rate limit'i azaltmak için tek bir forecast isteği yapıyoruz
       try {
         const forecastController = new AbortController()
         const forecastTimeout = setTimeout(() => forecastController.abort(), 10000) // 10 saniye
         
+        // Tek bir istekle hem forecast hem daily forecast verilerini al
         const forecastResponse = await fetch(
-          `${FORECAST_URL}?q=${encodeURIComponent(cityName)}&appid=${API_KEY}&units=metric&lang=tr&cnt=5`,
+          `${FORECAST_URL}?q=${encodeURIComponent(cityName)}&appid=${API_KEY}&units=metric&lang=tr&cnt=40`,
           {
             signal: forecastController.signal,
             headers: {
@@ -189,45 +224,18 @@ export const getWeatherData = async (cityName) => {
         
         if (forecastResponse.ok) {
           const forecastData = await forecastResponse.json()
-          // Forecast verilerini ana veriye ekle
-          data.forecast = forecastData.list
+          // Forecast verilerini ana veriye ekle (ilk 5 veri)
+          data.forecast = forecastData.list.slice(0, 5)
+          
+          // 7 günlük tahmin verilerini de aynı istekten al
+          const dailyData = getDailyForecast(forecastData.list, data)
+          data.dailyForecast = dailyData
         } else if (forecastResponse.status === 429) {
-          console.log('Forecast rate limit - atlanıyor')
+          console.log('Forecast rate limit - atlanıyor (opsiyonel veri)')
         }
       } catch (forecastError) {
         // Forecast hatası kritik değil, sadece logla
-        console.log('Forecast verisi alınamadı:', forecastError.message || forecastError)
-      }
-      
-      // 7 günlük tahmin verilerini al - timeout ile
-      try {
-        // Daily forecast API'si ücretli plan gerektirebilir, bu yüzden hourly forecast'ten günlük verileri çıkarıyoruz
-        // Maksimum 40 veri alabiliriz (5 gün x 8 veri/gün), bugünün verisini de ekleyerek 7 günü tamamlıyoruz
-        const dailyForecastController = new AbortController()
-        const dailyForecastTimeout = setTimeout(() => dailyForecastController.abort(), 10000) // 10 saniye
-        
-        const dailyForecastResponse = await fetch(
-          `${FORECAST_URL}?q=${encodeURIComponent(cityName)}&appid=${API_KEY}&units=metric&lang=tr&cnt=40`,
-          {
-            signal: dailyForecastController.signal,
-            headers: {
-              'Accept': 'application/json',
-            }
-          }
-        )
-        
-        clearTimeout(dailyForecastTimeout)
-        
-        if (dailyForecastResponse.ok) {
-          const dailyForecastData = await dailyForecastResponse.json()
-          // Her gün için bir veri seç (günlük ortalama) - bugünün verisini de ekle
-          const dailyData = getDailyForecast(dailyForecastData.list, data)
-          data.dailyForecast = dailyData
-        } else if (dailyForecastResponse.status === 429) {
-          console.log('Daily forecast rate limit - atlanıyor')
-        }
-      } catch (dailyError) {
-        console.log('7 günlük tahmin verisi alınamadı:', dailyError.message || dailyError)
+        console.log('Forecast verisi alınamadı (opsiyonel):', forecastError.message || forecastError)
       }
       
       // Cache'e kaydet - bugünün tarihi ile
