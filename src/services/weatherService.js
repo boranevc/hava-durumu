@@ -8,15 +8,44 @@ const DAILY_FORECAST_URL = 'https://api.openweathermap.org/data/2.5/forecast/dai
 const GEOCODING_URL = 'https://api.openweathermap.org/geo/1.0/direct'
 const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search'
 
+// Cache için basit bir Map (5 dakika TTL)
+const cache = new Map()
+const CACHE_TTL = 5 * 60 * 1000 // 5 dakika
+
 // Debug: API anahtarının okunup okunmadığını kontrol et
 console.log('API Key kontrol:', API_KEY ? 'Bulundu' : 'Bulunamadı')
 console.log('API Key uzunluk:', API_KEY?.length || 0)
+
+// Cache kontrolü
+const getCachedData = (key) => {
+  const cached = cache.get(key)
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.data
+  }
+  cache.delete(key)
+  return null
+}
+
+// Cache'e kaydet
+const setCachedData = (key, data) => {
+  cache.set(key, {
+    data,
+    timestamp: Date.now()
+  })
+}
 
 export const getWeatherData = async (cityName) => {
   if (!API_KEY || API_KEY === 'YOUR_API_KEY_HERE' || API_KEY.trim() === '') {
     throw new Error(
       'API anahtarı bulunamadı. Lütfen .env dosyasına VITE_WEATHER_API_KEY değişkenini ekleyin ve dev server\'ı yeniden başlatın.'
     )
+  }
+
+  // Cache kontrolü
+  const cacheKey = `weather_${cityName.toLowerCase()}`
+  const cachedData = getCachedData(cacheKey)
+  if (cachedData) {
+    return cachedData
   }
 
   try {
@@ -32,6 +61,9 @@ export const getWeatherData = async (cityName) => {
         throw new Error(
           `API anahtarı geçersiz veya aktif değil. Lütfen https://openweathermap.org/api adresinden yeni bir API anahtarı alın. Hata: ${errorData.message || 'Invalid API key'}`
         )
+      } else if (response.status === 429) {
+        // Rate limit hatası
+        throw new Error('Çok fazla istek yapıldı. Lütfen birkaç dakika sonra tekrar deneyin. (Rate limit aşıldı)')
       } else {
         throw new Error('Hava durumu bilgisi alınamadı. Lütfen daha sonra tekrar deneyin.')
       }
@@ -48,6 +80,8 @@ export const getWeatherData = async (cityName) => {
         const forecastData = await forecastResponse.json()
         // Forecast verilerini ana veriye ekle
         data.forecast = forecastData.list
+      } else if (forecastResponse.status === 429) {
+        console.log('Forecast rate limit - atlanıyor')
       }
     } catch (forecastError) {
       // Forecast hatası kritik değil, sadece logla
@@ -66,10 +100,15 @@ export const getWeatherData = async (cityName) => {
         // Her gün için bir veri seç (günlük ortalama) - bugünün verisini de ekle
         const dailyData = getDailyForecast(dailyForecastData.list, data)
         data.dailyForecast = dailyData
+      } else if (dailyForecastResponse.status === 429) {
+        console.log('Daily forecast rate limit - atlanıyor')
       }
     } catch (dailyError) {
       console.log('7 günlük tahmin verisi alınamadı:', dailyError)
     }
+    
+    // Cache'e kaydet
+    setCachedData(cacheKey, data)
     
     return data
   } catch (error) {
