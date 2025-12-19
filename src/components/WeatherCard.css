@@ -137,10 +137,13 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  padding-top: 16px;
+  padding: 20px 0;
   border-top: 1px solid rgba(0, 0, 0, 0.1);
   width: 100%;
+  margin: 0 auto;
+  margin-bottom: 0;
 }
 
 .feels-like-label {
@@ -230,7 +233,7 @@
 }
 
 .weekly-forecast {
-  margin-top: 20px;
+  margin-top: 0;
   padding-top: 25px;
   border-top: 1px solid rgba(0, 0, 0, 0.1);
 }
