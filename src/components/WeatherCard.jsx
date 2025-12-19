@@ -198,7 +198,7 @@ function WeatherCard({ weather }) {
       <div className="weather-details">
         <div className="detail-item">
           <span className="detail-label">
-            <WiThermometer style={{ fontSize: '1.2rem', marginRight: '6px', verticalAlign: 'middle' }} />
+            <WiThermometer style={{ fontSize: '1.2rem', marginRight: '6px', verticalAlign: 'middle', color: '#FF4444' }} />
             Min/Max
           </span>
           <span className="detail-value">
@@ -207,21 +207,21 @@ function WeatherCard({ weather }) {
         </div>
         <div className="detail-item">
           <span className="detail-label">
-            <WiHumidity style={{ fontSize: '1.2rem', marginRight: '6px', verticalAlign: 'middle' }} />
+            <WiHumidity style={{ fontSize: '1.2rem', marginRight: '6px', verticalAlign: 'middle', color: '#4A90E2' }} />
             Nem
           </span>
           <span className="detail-value">{weather.main.humidity}%</span>
         </div>
         <div className="detail-item">
           <span className="detail-label">
-            <WiStrongWind style={{ fontSize: '1.2rem', marginRight: '6px', verticalAlign: 'middle' }} />
+            <WiStrongWind style={{ fontSize: '1.2rem', marginRight: '6px', verticalAlign: 'middle', color: '#6C7A89' }} />
             Rüzgar
           </span>
           <span className="detail-value">{weather.wind?.speed || 0} m/s</span>
         </div>
         <div className="detail-item">
           <span className="detail-label">
-            <WiBarometer style={{ fontSize: '1.2rem', marginRight: '6px', verticalAlign: 'middle' }} />
+            <WiBarometer style={{ fontSize: '1.2rem', marginRight: '6px', verticalAlign: 'middle', color: '#9B59B6' }} />
             Basınç
           </span>
           <span className="detail-value">{weather.main.pressure} hPa</span>
@@ -229,7 +229,7 @@ function WeatherCard({ weather }) {
         {weather.visibility !== undefined && (
           <div className="detail-item">
             <span className="detail-label">
-              <WiDayHaze style={{ fontSize: '1.2rem', marginRight: '6px', verticalAlign: 'middle' }} />
+              <WiDayHaze style={{ fontSize: '1.2rem', marginRight: '6px', verticalAlign: 'middle', color: '#95A5A6' }} />
               Görüş
             </span>
             <span className="detail-value">{(weather.visibility / 1000).toFixed(1)} km</span>
@@ -238,7 +238,7 @@ function WeatherCard({ weather }) {
         {precipitationProb > 0 && (
           <div className="detail-item detail-item-precipitation">
             <span className="detail-label">
-              <WiRaindrops style={{ fontSize: '1.2rem', marginRight: '6px', verticalAlign: 'middle' }} />
+              <WiRaindrops style={{ fontSize: '1.2rem', marginRight: '6px', verticalAlign: 'middle', color: '#5B9BD5' }} />
               Yağmur İhtimali
             </span>
             <span className="detail-value">{precipitationProb}%</span>
@@ -246,14 +246,14 @@ function WeatherCard({ weather }) {
         )}
         <div className="detail-item">
           <span className="detail-label">
-            <WiSunrise style={{ fontSize: '1.2rem', marginRight: '6px', verticalAlign: 'middle' }} />
+            <WiSunrise style={{ fontSize: '1.2rem', marginRight: '6px', verticalAlign: 'middle', color: '#FFA500' }} />
             Gündoğumu
           </span>
           <span className="detail-value">{formatTime(weather.sys.sunrise, weather.timezone)}</span>
         </div>
         <div className="detail-item">
           <span className="detail-label">
-            <WiSunset style={{ fontSize: '1.2rem', marginRight: '6px', verticalAlign: 'middle' }} />
+            <WiSunset style={{ fontSize: '1.2rem', marginRight: '6px', verticalAlign: 'middle', color: '#FF6347' }} />
             Günbatımı
           </span>
           <span className="detail-value">{formatTime(weather.sys.sunset, weather.timezone)}</span>
