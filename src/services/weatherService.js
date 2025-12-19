@@ -8,29 +8,56 @@ const DAILY_FORECAST_URL = 'https://api.openweathermap.org/data/2.5/forecast/dai
 const GEOCODING_URL = 'https://api.openweathermap.org/geo/1.0/direct'
 const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search'
 
-// Cache için basit bir Map (5 dakika TTL)
+// Cache için basit bir Map
 const cache = new Map()
-const CACHE_TTL = 5 * 60 * 1000 // 5 dakika
+const CACHE_TTL = 10 * 60 * 1000 // 10 dakika (mevcut hava durumu için)
+const DAILY_CACHE_TTL = 3 * 60 * 60 * 1000 // 3 saat (7 günlük tahmin için - API her 3 saatte bir güncelliyor)
 
 // Debug: API anahtarının okunup okunmadığını kontrol et
 console.log('API Key kontrol:', API_KEY ? 'Bulundu' : 'Bulunamadı')
 console.log('API Key uzunluk:', API_KEY?.length || 0)
 
-// Cache kontrolü
-const getCachedData = (key) => {
+// Günün tarihini al (sadece tarih, saat değil)
+const getTodayKey = () => {
+  const today = new Date()
+  return `${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`
+}
+
+// Cache kontrolü - günlük cache kontrolü ile
+const getCachedData = (key, isDailyForecast = false) => {
   const cached = cache.get(key)
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+  if (!cached) return null
+  
+  const now = Date.now()
+  const ttl = isDailyForecast ? DAILY_CACHE_TTL : CACHE_TTL
+  
+  // Günlük tahmin için: Eğer bugünün cache'i varsa ve TTL içindeyse kullan
+  if (isDailyForecast) {
+    const todayKey = getTodayKey()
+    if (cached.dateKey === todayKey && now - cached.timestamp < ttl) {
+      return cached.data
+    }
+    // Eğer farklı bir günse veya TTL dolmuşsa cache'i temizle
+    cache.delete(key)
+    return null
+  }
+  
+  // Normal cache kontrolü
+  if (now - cached.timestamp < ttl) {
     return cached.data
   }
+  
   cache.delete(key)
   return null
 }
 
-// Cache'e kaydet
-const setCachedData = (key, data) => {
+// Cache'e kaydet - günlük cache ile
+const setCachedData = (key, data, isDailyForecast = false) => {
+  const todayKey = getTodayKey()
   cache.set(key, {
     data,
-    timestamp: Date.now()
+    timestamp: Date.now(),
+    dateKey: todayKey // Hangi güne ait olduğunu kaydet
   })
 }
 
@@ -41,11 +68,18 @@ export const getWeatherData = async (cityName) => {
     )
   }
 
-  // Cache kontrolü
+  // Cache kontrolü - günlük tahmin için özel kontrol
   const cacheKey = `weather_${cityName.toLowerCase()}`
-  const cachedData = getCachedData(cacheKey)
+  const todayKey = getTodayKey()
+  
+  // Önce normal cache'i kontrol et
+  const cachedData = getCachedData(cacheKey, false)
   if (cachedData) {
-    return cachedData
+    // Eğer cache'deki veri bugünün verisi değilse, günlük tahmin için yeniden istek yap
+    const cachedDateKey = cache.get(cacheKey)?.dateKey
+    if (cachedDateKey === todayKey) {
+      return cachedData
+    }
   }
 
   try {
@@ -107,8 +141,8 @@ export const getWeatherData = async (cityName) => {
       console.log('7 günlük tahmin verisi alınamadı:', dailyError)
     }
     
-    // Cache'e kaydet
-    setCachedData(cacheKey, data)
+    // Cache'e kaydet - bugünün tarihi ile
+    setCachedData(cacheKey, data, true) // 7 günlük tahmin için günlük cache
     
     return data
   } catch (error) {
