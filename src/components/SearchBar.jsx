@@ -19,7 +19,7 @@ function SearchBar({ onSearch, loading }) {
       <input
         type="text"
         className="search-input"
-        placeholder="Şehir veya ilçe adı girin (örn: Istanbul, London, New York)"
+        placeholder="Şehir veya ilçe adı girin (Istanbul, London, New York)"
         value={input}
         onChange={(e) => setInput(e.target.value)}
         disabled={loading}
